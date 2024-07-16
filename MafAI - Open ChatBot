@@ -1,0 +1,50 @@
+import torch
+from transformers import GPT2LMHeadModel, GPT2Tokenizer, Trainer, TrainingArguments
+from torch.utils.data import Dataset
+
+class MyDataset(Dataset):
+    def __init__(self, tokenizer, data_file, max_length=128):
+        self.tokenizer = tokenizer
+        self.data = []
+        with open(data_file, 'r', encoding='utf-8') as f:
+            lines = f.readlines()
+            for line in lines:
+                # Tokenizacja każdej linii oddzielnie
+                tokenized = tokenizer(line, truncation=True, padding='max_length', max_length=max_length, return_tensors="pt")
+                self.data.append(tokenized)
+
+    def __len__(self):
+        return len(self.data)
+
+    def __getitem__(self, idx):
+        return self.data[idx]
+
+def fine_tune_model():
+    tokenizer = GPT2Tokenizer.from_pretrained('flax-community/papuGaPT2')
+    tokenizer.pad_token = tokenizer.eos_token
+    dataset = MyDataset(tokenizer, r"C:\Users\media\programowanie\MafAI-1.0 Classic\conversation_data_pl.txt", max_length=128)
+
+    training_args = TrainingArguments(
+        output_dir='./results',
+        overwrite_output_dir=True,
+        per_device_train_batch_size=8,  # Dostosuj rozmiar partii do swoich potrzeb
+        num_train_epochs=3,           # Dostosuj liczbę epok do swoich potrzeb
+        logging_dir='./logs',
+    )
+
+    model = GPT2LMHeadModel.from_pretrained('flax-community/papuGaPT2')
+
+    # Dostosowanie modelu do formatu oczekiwanego przez Trainer (dla GPT-2)
+    model.config.pad_token_id = model.config.eos_token_id
+
+    trainer = Trainer(
+        model=model,
+        args=training_args,
+        train_dataset=dataset,
+        # Nie przekazujemy compute_loss
+    )
+
+    trainer.train()
+
+if __name__ == "__main__":
+    fine_tune_model()
